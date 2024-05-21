@@ -32,10 +32,13 @@ def load_index_item(filepath:str, index_name:str, value_name:str):
         #remove all unecessary columns
         if column!=index_name and column!=value_name:
             index_item_dict.drop(columns=[column], axis=1, inplace=True)
-    #print(index_item_dict.head(10))
     return index_item_dict
 
 def to_csr(dataframe:pd.DataFrame, user_name:str, item_name:str, weight_name:str):
+    """
+    Returns a SciPy CSR_Matrix from a given pandas dataframe representing the 
+    user-item matrix/dataset
+    """
     users = dataframe[user_name].max()
     items = dataframe[item_name].max()
     coo = sparse.coo_matrix((dataframe[weight_name].astype(float), (dataframe[user_name], dataframe[item_name])), shape=(users+1,items+1))
@@ -46,17 +49,14 @@ def to_csr(dataframe:pd.DataFrame, user_name:str, item_name:str, weight_name:str
 
 if __name__=="__main__":
     #Args: python3 main.py <sparse-matrix> <index-class>
+    #Maybe add userId, movieId, rating as arguments?
     if len(sys.argv) != 3:
         print("Args need to be: python3 main.py <sparse-matrix> <index-class>")
         sys.exit(-1)
-    #load index-value
+    #Load datasets into dataframes
     train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
-    print(train_user_items.shape[0])
-    print(test_user_items.shape[0])
-    #Get rid of extra row
+    #Load user-item dataframe into csr_matrix format
+    #TODO: Get rid of extra row in csr_matrix? Or ignore?
     train_user_items = to_csr(train_user_items, "userId", "movieId", "rating")
-    #print(user_items.loc[1, "title"])
-    #train_data = user_items.sample(n=int(0.7*len(user_items)), axis=0)
-    #print(train_data.head(10))
-    #test_data = user_items.sample(n=0.3*len(user_items))
+
