@@ -44,6 +44,13 @@ def to_csr(dataframe:pd.DataFrame, user_name:str, item_name:str, weight_name:str
     coo = sparse.coo_matrix((dataframe[weight_name].astype(float), (dataframe[user_name], dataframe[item_name])), shape=(users+1,items+1))
     return coo.tocsr()
 
+def output_csr_as_txt(filename: str, csr: sparse._csr.csr_matrix):
+    file = open(filename,'w')
+    for i in range(csr.shape[0]):
+        for j in csr[i].nonzero()[1]:
+            file.write(str(i)+' ' +str(j)+' '+str(csr[i,j])+'\n')
+    file.close
+    return
 
 
 
@@ -54,9 +61,12 @@ if __name__=="__main__":
         print("Args need to be: python3 main.py <sparse-matrix> <index-class>")
         sys.exit(-1)
     #Load datasets into dataframes
+    print("\tLoading movie/user matrix:", sys.argv[1], "\n\tUsing", sys.argv[2], "as key matrix.")
     train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
     #Load user-item dataframe into csr_matrix format
     #TODO: Get rid of extra row in csr_matrix? Or ignore?
     train_user_items = to_csr(train_user_items, "userId", "movieId", "rating")
+    output_csr_as_txt("user-movie-rating.txt", train_user_items)
+    print("successful!")
 
