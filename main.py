@@ -47,7 +47,14 @@ def to_csr(dataframe:pd.DataFrame, user_name:str, item_name:str, weight_name:str
     return coo.tocsr()
 
 def output_csr_as_txt(filename: str, csr: sparse._csr.csr_matrix, column_names: list):
-    "Converts CSR input to txt file"
+    """
+    Writes the contents of a CSR (Compressed Sparse Row) matrix to a text file, including column headers.
+    
+    Parameters:
+    filename (str): The name of the output text file.
+    csr (sparse._csr.csr_matrix): The CSR matrix containing the user-item data.
+    column_names (list): A list of column names to include as headers in the output file.
+    """
     file = open(filename,'w')
     # Write the header with column names and types
     header = ' '.join(column_names)
@@ -58,6 +65,19 @@ def output_csr_as_txt(filename: str, csr: sparse._csr.csr_matrix, column_names: 
             file.write(f"{i} {j} {csr[i, j]}\n")
     file.close
     
+def numpy_array_to_txt(filename: str, array: np.ndarray):
+    """
+    Writes a 2D NumPy array to a text file, where each row represents a user or item and their factors.
+    
+    Parameters:
+    filename (str): The name of the output text file.
+    array (np.ndarray): The 2D NumPy array to write to the file.
+    """
+    file = open(filename, 'w')
+    for row in array:
+        row_str = ' '.join(map(str, row))
+        file.write(row_str + '\n')
+    file.close
 
 if __name__=="__main__":
     #Args: python3 main.py <sparse-matrix> <index-class>
@@ -69,21 +89,25 @@ if __name__=="__main__":
     print("\tLoading movie/user matrix:", sys.argv[1], "\n\tUsing", sys.argv[2], "as key matrix.")
     train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
-    print(train_user_items.head())
-    print(index_item_dict.head())
     merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
-    print(merged.head())
 
     # began messing with pytorch
     # check this link https://www.kaggle.com/code/jhoward/collaborative-filtering-deep-dive
-    # dls = CollabDataLoaders.from_df(merged, item_name='title', bs=64)
-    # dls.show_batch()
-    # n_users  = len(dls.classes['user'])
-    # n_movies = len(dls.classes['title'])
-    # n_factors = 5
+    dls = CollabDataLoaders.from_df(merged, item_name='title', bs=64)
+    dls.show_batch()
+    n_users = len(dls.classes['userId'])
+    n_movies = len(dls.classes['title'])
+    n_factors = 5
+    # Initialize user and item factors
+    # This is part of the process of decomposing the user-item matrix into lower dimensional space
+    user_factors = np.random.rand(n_users, n_factors)
+    item_factors = np.random.rand(n_movies, n_factors)
+    
+    print("Initial User Factors:")
+    print(user_factors)
+    print("Initial Item Factors:")
+    print(item_factors)
 
-    # user_factors = torch.randn(n_users, n_factors)
-    # movie_factors = torch.randn(n_movies, n_factors)
     # Save the merged DataFrame to a new CSV file
     # merged.to_csv('merged_output.csv', index=False)
     
@@ -92,5 +116,11 @@ if __name__=="__main__":
     train_user_items = to_csr(train_user_items, "userId", "movieId", "rating")
 
     output_csr_as_txt("user-movie-rating.txt", train_user_items, ["userId", "movieId", "rating"])
-    print("successful!")
+    numpy_array_to_txt("user-matrix.txt", user_factors)
+    numpy_array_to_txt("item-matrix.txt", item_factors)
 
+    # I would be weary of the below print statement, I was working on the above numpy to txt function
+    # and I accidentally outputted a 1.3 GB txt file. It DOES NOT do this anymore (I had an extra for loop by accident), 
+    # but considering that this is small data, we might want to consider this in terms of efficiency, 
+    # storage, and timing for the bigger data set.
+    print("Done!")
