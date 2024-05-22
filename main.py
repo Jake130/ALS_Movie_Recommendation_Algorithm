@@ -2,6 +2,7 @@ import csv
 import sys
 import pandas as pd
 from scipy import sparse
+import implicit
 from fastai.collab import *
 from fastai.tabular.all import *
 
@@ -79,6 +80,12 @@ def numpy_array_to_txt(filename: str, array: np.ndarray):
         file.write(row_str + '\n')
     file.close
 
+def create_als_model() ->sparse._csr.csr_matrix:
+    """Returns model trained of of implementing ALS on the 
+    user-items csr_matrix"""
+    return implicit.als.AlternatingLeastSquares(factors=50, iterations=10, regularization=0.01)
+
+
 if __name__=="__main__":
     #Args: python3 main.py <sparse-matrix> <index-class>
     #Maybe add userId, movieId, rating as arguments?
@@ -114,6 +121,17 @@ if __name__=="__main__":
     #Load user-item dataframe into csr_matrix format
     #TODO: Get rid of extra row in csr_matrix? Or ignore?
     train_user_items = to_csr(train_user_items, "userId", "movieId", "rating")
+
+    #Create Model
+    als_model = create_als_model()
+    als_model.fit(train_user_items)
+    #Get top 5
+    movie_ids, ratings = als_model.recommend(2, train_user_items[5], N=5)
+    movies = [index_item_dict.loc[movie_id, "title"] for movie_id in movie_ids]
+    
+    for movie,rating in zip(movies, ratings):
+        print(f"{movie}: {rating}")
+
 
     output_csr_as_txt("user-movie-rating.txt", train_user_items, ["userId", "movieId", "rating"])
     numpy_array_to_txt("user-matrix.txt", user_factors)
