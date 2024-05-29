@@ -1,12 +1,17 @@
 import csv
+import os
 import sys
 import pandas as pd
 from scipy import sparse
 import implicit
 from fastai.collab import *
 from fastai.tabular.all import *
+from collections import Counter
+import torch
+import torch.nn as nn
 
-
+# Set OpenBLAS to use only one thread
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 #Read ratings.csv into a train/test pandas dataframe
 def load_user_item(filepath:str, user_name:str, item_name:str, weight_name:str):
@@ -80,11 +85,64 @@ def numpy_array_to_txt(filename: str, array: np.ndarray):
         file.write(row_str + '\n')
     file.close
 
-def create_als_model() ->sparse._csr.csr_matrix:
+def create_als_model() -> implicit.als.AlternatingLeastSquares:
     """Returns model trained of of implementing ALS on the 
     user-items csr_matrix"""
     return implicit.als.AlternatingLeastSquares(factors=50, iterations=10, regularization=0.01)
 
+def accuracy_tester(train_data, test_data, model) -> float:
+    """
+    Evaluates the accuracy of a trained ALS model by computing the Root Mean Squared Error (RMSE) on the test dataset.
+
+    Parameters:
+    train_data (pd.DataFrame): The training dataset containing user-item interactions.
+    test_data (pd.DataFrame): The test dataset containing user-item interactions for evaluation.
+    model (implicit.als.AlternatingLeastSquares): The trained ALS model.
+
+    Returns:
+    float: The RMSE of the model's predictions on the test dataset.
+
+    Description:
+    This function first converts the test dataset into PyTorch tensors for users, items, and ratings. It then extracts the
+    latent factors (user and item embeddings) from the trained ALS model and converts these factors into PyTorch tensors.
+    Using these factors, it predicts the ratings for the user-item pairs in the test dataset. The Mean Squared Error (MSE)
+    between the predicted ratings and the true ratings is calculated, and the square root of this MSE gives the RMSE. This
+    RMSE value is returned as a measure of the model's accuracy.
+
+    Example:
+    >>> train_data, test_data = load_user_item('ratings.csv', 'userId', 'movieId', 'rating')
+    >>> model = create_als_model()
+    >>> model.fit(train_user_items_csr)
+    >>> rmse = accuracy_tester(train_data, test_data, model)
+    >>> print(f'RMSE: {rmse}')
+    """
+    # Convert test data to PyTorch tensors
+    user_ids = torch.tensor(test_data['userId'].values - 1)  # Adjusting for 0-based indexing
+    item_ids = torch.tensor(test_data['movieId'].values - 1)  # Adjusting for 0-based indexing
+    true_ratings = torch.tensor(test_data['rating'].values, dtype=torch.float32)
+    
+    # Get latent factors from the model
+    user_factors = model.user_factors
+    item_factors = model.item_factors
+
+    # Convert latent factors to PyTorch tensors
+    user_factors_tensor = torch.tensor(user_factors, dtype=torch.float32)
+    item_factors_tensor = torch.tensor(item_factors, dtype=torch.float32)
+
+    # Define the MSE Loss function
+    mse_loss = nn.MSELoss()
+
+    # Predict ratings
+    predicted_ratings = (user_factors_tensor[user_ids] * item_factors_tensor[item_ids]).sum(dim=1)
+
+    # Calculate MSE loss
+    loss = mse_loss(predicted_ratings, true_ratings)
+
+    # Calculate RMSE
+    rmse = torch.sqrt(loss).item()
+    print(f'RMSE: {rmse}')
+
+    return rmse
 
 if __name__=="__main__":
     #Args: python3 main.py <sparse-matrix> <index-class>
@@ -98,44 +156,66 @@ if __name__=="__main__":
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
     merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
 
+
+    # will maybe comment back in later
     # began messing with pytorch
     # check this link https://www.kaggle.com/code/jhoward/collaborative-filtering-deep-dive
-    dls = CollabDataLoaders.from_df(merged, item_name='title', bs=64)
-    dls.show_batch()
-    n_users = len(dls.classes['userId'])
-    n_movies = len(dls.classes['title'])
-    n_factors = 5
-    # Initialize user and item factors
-    # This is part of the process of decomposing the user-item matrix into lower dimensional space
-    user_factors = np.random.rand(n_users, n_factors)
-    item_factors = np.random.rand(n_movies, n_factors)
+    # dls = CollabDataLoaders.from_df(merged, item_name='title', bs=64)
+    # dls.show_batch()
+    # n_users = len(dls.classes['userId'])
+    # n_movies = len(dls.classes['title'])
+    # n_factors = 5
+    # # Initialize user and item factors
+    # # This is part of the process of decomposing the user-item matrix into lower dimensional space
+    # user_factors = np.random.rand(n_users, n_factors)
+    # item_factors = np.random.rand(n_movies, n_factors)
     
-    print("Initial User Factors:")
-    print(user_factors)
-    print("Initial Item Factors:")
-    print(item_factors)
+    # print("Initial User Factors:")
+    # print(user_factors)
+    # print("Initial Item Factors:")
+    # print(item_factors)
 
     # Save the merged DataFrame to a new CSV file
     # merged.to_csv('merged_output.csv', index=False)
     
     #Load user-item dataframe into csr_matrix format
     #TODO: Get rid of extra row in csr_matrix? Or ignore?
-    train_user_items = to_csr(train_user_items, "userId", "movieId", "rating")
+    train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
 
     #Create Model
     als_model = create_als_model()
-    als_model.fit(train_user_items)
+    als_model.fit(train_user_items_csr)
     #Get top 5
-    movie_ids, ratings = als_model.recommend(2, train_user_items[5], N=5)
-    movies = [index_item_dict.loc[movie_id, "title"] for movie_id in movie_ids]
+    n_users = train_user_items["userId"].nunique()
+    userids = np.arange(n_users)
+    recommendations = []
+    for userid in userids:
+        movie_ids, ratings = als_model.recommend(userid, train_user_items_csr[userid], N=5)
+        # Debugging: Print the movie_ids to see what we get
+        print(f"User {(userid + 1)} recommended movie IDs: {movie_ids + 1}")
+        # Check if movie_id exists in index_item_dict to avoid KeyError
+        valid_movie_ids = [movie_id + 1 for movie_id in movie_ids if movie_id + 1 in index_item_dict.index]
+        recommendations.extend(valid_movie_ids)  # Collect all valid recommendations
     
-    for movie,rating in zip(movies, ratings):
-        print(f"{movie}: {rating}")
+    # Count the occurrences of each recommended movie and get the top 5 most common recommendations
+    movie_counter = Counter(recommendations)
+    top_5_recommendations = movie_counter.most_common(5)
 
+    print("Top 5 most common recommendations:")
+    for movie_id, count in top_5_recommendations:
+        movie_title = index_item_dict.loc[movie_id, "title"]
+        print(f"{movie_title}: {count} times recommended")
 
-    output_csr_as_txt("user-movie-rating.txt", train_user_items, ["userId", "movieId", "rating"])
-    numpy_array_to_txt("user-matrix.txt", user_factors)
-    numpy_array_to_txt("item-matrix.txt", item_factors)
+    output_csr_as_txt("user-movie-rating.txt", train_user_items_csr, ["userId", "movieId", "rating"])
+    # numpy_array_to_txt("user-matrix.txt", user_factors)
+    # numpy_array_to_txt("item-matrix.txt", item_factors)
+
+    rmse = accuracy_tester(train_user_items, test_user_items, als_model)
+
+    # RMSE (Root Mean Squared Error) is a standard way to measure the error of a model in predicting 
+    # quantitative data. It provides an aggregate measure of the accuracy of the model's predictions. 
+    # The lower the RMSE, the better the model's performance in terms of predictive accuracy.
+    print(f"RMSE: {rmse}")
 
     # I would be weary of the below print statement, I was working on the above numpy to txt function
     # and I accidentally outputted a 1.3 GB txt file. It DOES NOT do this anymore (I had an extra for loop by accident), 
