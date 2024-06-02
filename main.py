@@ -9,9 +9,21 @@ from fastai.tabular.all import *
 from collections import Counter
 import torch
 import torch.nn as nn
+from training import ALS_Model
 
 # Set OpenBLAS to use only one thread
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
+def load_data(filepath:str, user_name:str, item_name:str, weight_name:str):
+    #Read ALL data into pandas dataframe, this will eventually become the training set 
+    print("loading") 
+    user_items = pd.read_csv(filepath, sep=',')
+    for column in user_items.columns:
+        if column!=user_name and column!=item_name and column!=weight_name:
+            user_items.drop(columns=column, inplace=True)
+    #shuffle data
+    user_items = user_items.sample(frac=1).reset_index(drop=True)
+    return user_items
 
 #Read ratings.csv into a train/test pandas dataframe
 def load_user_item(filepath:str, user_name:str, item_name:str, weight_name:str):
@@ -124,6 +136,8 @@ def accuracy_tester(train_data, test_data, model) -> float:
     # Get latent factors from the model
     user_factors = model.user_factors
     item_factors = model.item_factors
+    print(f"user factors:{len(user_factors)}")
+    print(f"item factors:{len(item_factors)}")
 
     # Convert latent factors to PyTorch tensors
     user_factors_tensor = torch.tensor(user_factors, dtype=torch.float32)
@@ -152,9 +166,32 @@ if __name__=="__main__":
         sys.exit(-1)
     #Load datasets into dataframes
     print("\tLoading movie/user matrix:", sys.argv[1], "\n\tUsing", sys.argv[2], "as key matrix.")
-    train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
+    #train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
+    train_user_items = load_data(sys.argv[1], "userId", "movieId", "rating")
+    #print(train_user_items.shape)
+    #Create CSR
+    #train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
+    num_users = train_user_items["userId"].max()
+    num_items = train_user_items["movieId"].max()
+    #Incremented size takes care of csr 0-indexing
+    train_user_items_csr = sparse.csr_array((train_user_items["rating"], (train_user_items["userId"], train_user_items["movieId"])), 
+                                            shape=(num_users+1,train_user_items["movieId"].max()+1))
+    #Partition Data
+    partition_point = (train_user_items.shape[0] * 7)//10
+    train_user_items, test_user_items = train_user_items.iloc[:partition_point], train_user_items.iloc[partition_point:]
+    #Make Total Data Multi-Indexed
+    print("Multi-Inexing")
+    train_user_items.set_index(["userId", "movieId"], inplace=True)
+    test_user_items.set_index(["userId", "movieId"], inplace=True)
+    print(train_user_items.head(10))
+    print(test_user_items.head(10))
+
+    als_model = ALS_Model(num_users, num_items, 50)         #Set # of factors to 50
+    #Load index->item mapping
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
-    merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
+    print(als_model.means_squared_error(train_user_items, train_user_items_csr))
+    
+    #merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
 
 
     # will maybe comment back in later
@@ -180,17 +217,20 @@ if __name__=="__main__":
     
     #Load user-item dataframe into csr_matrix format
     #TODO: Get rid of extra row in csr_matrix? Or ignore?
-    train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
+
 
     #Create Model
+    """
     als_model = create_als_model()
     als_model.fit(train_user_items_csr)
     #Get top 5
     n_users = train_user_items["userId"].nunique()
+    #Don't we want this to start with 1?
     userids = np.arange(n_users)
+    print(f"First User: {userids[0]}")
     recommendations = []
     for userid in userids:
-        movie_ids, ratings = als_model.recommend(userid, train_user_items_csr[userid], N=5)
+        movie_ids, ratings = als_model.recommend(userid+1, train_user_items_csr[userid+1], N=5)
         # Debugging: Print the movie_ids to see what we get
         print(f"User {(userid + 1)} recommended movie IDs: {movie_ids + 1}")
         # Check if movie_id exists in index_item_dict to avoid KeyError
@@ -222,3 +262,4 @@ if __name__=="__main__":
     # but considering that this is small data, we might want to consider this in terms of efficiency, 
     # storage, and timing for the bigger data set.
     print("Done!")
+    """
