@@ -16,7 +16,7 @@ os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 def load_data(filepath:str, user_name:str, item_name:str, weight_name:str):
     #Read ALL data into pandas dataframe, this will eventually become the training set 
-    print("loading") 
+    print("Loading data...") 
     user_items = pd.read_csv(filepath, sep=',')
     for column in user_items.columns:
         if column!=user_name and column!=item_name and column!=weight_name:
@@ -167,20 +167,20 @@ if __name__=="__main__":
     #Load datasets into dataframes
     print("\tLoading movie/user matrix:", sys.argv[1], "\n\tUsing", sys.argv[2], "as key matrix.")
     #train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
-    train_user_items = load_data(sys.argv[1], "userId", "movieId", "rating")
+    user_items = load_data(sys.argv[1], "userId", "movieId", "rating")
     #print(train_user_items.shape)
     #Create CSR
     #train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
-    num_users = train_user_items["userId"].max()
-    num_items = train_user_items["movieId"].max()
+    num_users = user_items["userId"].max()
+    num_items = user_items["movieId"].max()
     #Incremented size takes care of csr 0-indexing
-    train_user_items_csr = sparse.csr_array((train_user_items["rating"], (train_user_items["userId"], train_user_items["movieId"])), 
-                                            shape=(num_users+1,train_user_items["movieId"].max()+1))
+    user_items_csr = sparse.csr_array((user_items["rating"], (user_items["userId"], user_items["movieId"])), 
+                                            shape=(num_users+1,user_items["movieId"].max()+1))
     #Partition Data
-    partition_point = (train_user_items.shape[0] * 7)//10
-    train_user_items, test_user_items = train_user_items.iloc[:partition_point], train_user_items.iloc[partition_point:]
+    partition_point = (user_items.shape[0] * 7)//10
+    train_user_items, test_user_items = user_items.iloc[:partition_point], user_items.iloc[partition_point:]
     #Make Total Data Multi-Indexed
-    print("Multi-Inexing")
+    print("Multi-Indexing...")
     train_user_items.set_index(["userId", "movieId"], inplace=True)
     test_user_items.set_index(["userId", "movieId"], inplace=True)
     print(train_user_items.head(10))
@@ -189,7 +189,7 @@ if __name__=="__main__":
     als_model = ALS_Model(num_users, num_items, 50)         #Set # of factors to 50
     #Load index->item mapping
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
-    print(als_model.means_squared_error(train_user_items, train_user_items_csr))
+    print(als_model.means_squared_error(train_user_items, user_items_csr))
     
     #merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
 
