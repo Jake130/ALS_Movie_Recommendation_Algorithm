@@ -13,7 +13,6 @@ class ALS_Model():
 
         model = ALS_Model(<number of users>, <number of items>, <number of latent factors>, <learning rate>, <maximum iterations>, <convergence threshold>, <l2 lambda value>, <scalar for factor initialization>, <scalar for bias initialization>)
         """
-        
         # random.seed(42) # you can seed specific randomization to check how specific initialization will impact loss!
         # Try changing the seed to any number and take note of the initial values and how they impact MSE calculation
         self.factor_scale = factor_scale # an adjustable scalar for factor initialization
@@ -183,7 +182,7 @@ class ALS_Model():
 
 if __name__=="__main__":
     #This is for testing
-    als = ALS_Model(3, 4, 5, 0.001, 50, 0.0001, 0.1, 0.1, 1.0)
+    als = ALS_Model(3, 4, 5, 0.001, 100, 0.0001, 0.1, 0.1, 1.0)
     print(als.user_factors)
     print("user biases: ", als.user_biases)
     print(als.item_factors)
