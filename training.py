@@ -11,7 +11,7 @@ class ALS_Model():
         """
         Usage:
 
-        model = ALS_Model(<number of users>, <number of items>, <number of latent factors>, <learning rate>, <maximum iterations>, <convergence threshold>, <l2 lambda value>, <scalar for factor initialization>, <scalar for bias initialization>)
+        model = ALS_Model(<number of users>, <number of items>, <number of latent factors>, <eta = learning rate>, <maximum iterations>, <convergence threshold>, <l2 lambda value>, <scalar for factor initialization>, <scalar for bias initialization>)
         """
         # random.seed(42) # you can seed specific randomization to check how specific initialization will impact loss!
         # Try changing the seed to any number and take note of the initial values and how they impact MSE calculation
@@ -102,13 +102,10 @@ class ALS_Model():
             # Also did some more research and found this formula
             
             # May want to add bias before subtracting actual rating
-            user_id = int(user_id)
-            item_id = int(item_id)
-
             # Compute y * (w^T x + b)
-            z = self.dot_product(user_id, item_id)
+            y_hat = self.dot_product(user_id, item_id)
             # could be z - ratings[i][j]??
-            error = ratings[user_id, item_id] - z
+            error = ratings[user_id, item_id] - y_hat
             
             for k in range(self.n_latency_factors):
                 grad_user_factors[user_id][k] += -2 * error * self.item_factors[k][item_id] + 2 * self.l2_factor * self.user_factors[user_id][k]
@@ -118,8 +115,6 @@ class ALS_Model():
             grad_item_biases[item_id] += -2 * error
 
         return grad_user_factors, grad_item_factors, grad_user_biases, grad_item_biases
-        
-        return grad_w, grad_b
 
     def l2_regularizer(self, element, l2_factor):
         """Generates gradient L2 regularizer to be added to ________"""
@@ -128,11 +123,6 @@ class ALS_Model():
 
     def finetune_matrix(self, matrix):
         """Improves the weights of ONE of the factor matrices"""
-        pass
-
-    def compute_loss(self, user_id, item_id):
-        """Find loss between actual score and predicted score"""
-        actual_score = self.user_item_matrix[user_id][item_id]
         pass
 
     def train(self, training_data, ratings, test_data):
@@ -176,9 +166,9 @@ class ALS_Model():
 
         return self.user_factors, self.item_factors, self.user_biases, self.item_biases, train_losses, test_losses
     
-    def predict_als(self, user_id, item_id):
-        """Predict the probability of the correct rating label given the attributes, user_factor[i] & item_factor[i]"""
-        return self.dot_product(user_id, item_id)
+    # def predict_als(self, user_id, item_id):
+    #     """Predict the probability of the correct rating label given the attributes, user_factor[i] & item_factor[i]"""
+    #     return self.dot_product(user_id, item_id)
 
 if __name__=="__main__":
     #This is for testing
@@ -210,7 +200,7 @@ if __name__=="__main__":
     all_data_df = pd.DataFrame(index=ratings.keys())
 
     # Split the data into training and test sets
-    # You can also add a random_state = parameter to this function to seed splits
+    # You can also add a random_state = (a number) parameter to this function to seed splits
     training_data, test_data = train_test_split(all_data_df, test_size=0.3)
 
     # Train data
