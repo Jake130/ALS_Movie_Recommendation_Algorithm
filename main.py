@@ -10,6 +10,7 @@ from collections import Counter
 import torch
 import torch.nn as nn
 from training import ALS_Model
+from alternate_training import ALT_ALS_Model
 
 # Set OpenBLAS to use only one thread
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -171,25 +172,49 @@ if __name__=="__main__":
     #print(train_user_items.shape)
     #Create CSR
     #train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
-    num_users = user_items["userId"].max()
-    num_items = user_items["movieId"].max()
+    num_users = user_items["userId"].nunique()
+    num_items = user_items["movieId"].nunique()
+    items_range = user_items["movieId"].max()
+    print(num_users, num_items)
     #Incremented size takes care of csr 0-indexing
+    
     user_items_csr = sparse.csr_array((user_items["rating"], (user_items["userId"], user_items["movieId"])), 
                                             shape=(num_users+1,user_items["movieId"].max()+1))
-    #Partition Data
     partition_point = (user_items.shape[0] * 7)//10
     train_user_items, test_user_items = user_items.iloc[:partition_point], user_items.iloc[partition_point:]
     #Make Total Data Multi-Indexed
     print("Multi-Indexing...")
     train_user_items.set_index(["userId", "movieId"], inplace=True)
     test_user_items.set_index(["userId", "movieId"], inplace=True)
+    #<num_users> <num_items> <n_latency_factors> <eta> <max_iters> <convergence_threshold> <l2_factor> <factor_scale> <bias_scale>
+    als_model = ALT_ALS_Model(user_items["movieId"].unique(), num_users, num_items, 50, .001, 20, .0001, .01, .1, 1.0)
+    #Partition Data
+    #Id-indexed
+    print(user_items_csr[1,1])
+    print(user_items_csr[1,47])
+    print(user_items_csr[1,2])
+
+
     print(train_user_items.head(10))
     print(test_user_items.head(10))
 
-    als_model = ALS_Model(num_users, num_items, 50)         #Set # of factors to 50
+    
+    #als_model = ALT_ALS_Model(train_user_items, items_range, num_users, num_items, 50, .001, 10, .0001, .01, .1, 1.0)
+    print("Training...")
+    user_factors, item_factors, user_biases, item_biases, train_losses, test_losses = als_model.train(train_user_items, user_items_csr, test_user_items)
+    
+    plt.plot(train_losses, label='Training Loss')
+    plt.plot(test_losses, label='Testing Loss')
+    plt.xlabel('Iterations')
+    plt.ylabel('Mean Squared Error')
+    plt.legend()
+    plt.title('Training and Testing Loss over Iterations')
+    plt.show()
+    
     #Load index->item mapping
+    #Used for recommendation
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
-    print(als_model.means_squared_error(train_user_items, user_items_csr))
+    #print(als_model.means_squared_error(train_user_items, user_items_csr))
     
     #merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
 
