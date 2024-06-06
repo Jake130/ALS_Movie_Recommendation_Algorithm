@@ -180,15 +180,15 @@ class ALT_ALS_Model():
                 #Update user factors & biases
                 for i in range(len(self.user_factors)):
                     for k in range(self.n_latency_factors):
-                        self.user_factors[i][k] -= .1 * self.eta * grad_factors[i][k]
-                    self.user_biases[i] -= .1 * self.eta * grad_biases[i]
+                        self.user_factors[i][k] -= .45 * self.eta * grad_factors[i][k]
+                    self.user_biases[i] -= .45 * self.eta * grad_biases[i]
             else:
                 #Update item factors & biases
                 grad_factors, grad_biases = self.compute_item_gradients(training_data, ratings)
                 for j in range(len(self.item_factors[0])):
                     for k in range(self.n_latency_factors):
-                        self.item_factors[k][j] -= self.eta * grad_factors[j][k]
-                    self.item_biases[j] -= self.eta * grad_biases[j]
+                        self.item_factors[k][j] -= .4 * self.eta * grad_factors[j][k]
+                    self.item_biases[j] -= .4 * self.eta * grad_biases[j]
 
             train_loss = self.means_squared_error(training_data, ratings)
             test_loss = self.means_squared_error(test_data, ratings)
