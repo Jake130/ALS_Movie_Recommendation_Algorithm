@@ -187,7 +187,7 @@ if __name__=="__main__":
     train_user_items.set_index(["userId", "movieId"], inplace=True)
     test_user_items.set_index(["userId", "movieId"], inplace=True)
     #<num_users> <num_items> <n_latency_factors> <eta> <max_iters> <convergence_threshold> <l2_factor> <factor_scale> <bias_scale>
-    als_model = ALT_ALS_Model(user_items["movieId"].unique(), num_users, num_items, 50, .001, 20, .0001, .01, 1.0, 1.0)
+    als_model = ALT_ALS_Model(user_items["movieId"].unique(), num_users, num_items, 50, .001, 20, .0001, .01, .1, 1.0)
     #Partition Data
     #Id-indexed
     print(user_items_csr[1,1])
