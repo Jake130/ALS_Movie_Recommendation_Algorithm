@@ -254,7 +254,7 @@ class ALT_ALS_Model():
 
 if __name__=="__main__":
     #This is for testing
-    als = ALT_ALS_Model(3, 4, 5, 0.001, 100, 0.0001, 0.1, 0.1, 1.0)
+    als = ALT_ALS_Model(3, 4, 5, 0.001, 50, 0.0001, 0.1, 0.1, 1.0)
     print(als.user_factors)
     print("user biases: ", als.user_biases)
     print(als.item_factors)
