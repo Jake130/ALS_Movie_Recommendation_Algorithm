@@ -66,7 +66,7 @@ class ALT_ALS_Model():
         result = 0.0
         for i in range(self.n_latency_factors):
             result += self.user_factors[user_id-1][i]*self.item_factors[i][item_id]         #item-index already 0-indexed
-        result += self.user_biases[user_id-1] + self.item_biases[user_id-1]
+        result += self.user_biases[user_id-1] + self.item_biases[item_id]
         return result
 
     def sigmoid_range(self, value:int, range=5.0):
@@ -84,6 +84,24 @@ class ALT_ALS_Model():
             # indices is a tuple of (userId, movieId)
             n += 1.0
             dif = ratings[indices[0], indices[1]] - self.dot_product(indices[0], indices[1])
+            sum += dif**2
+        return sum / n
+    
+    def final_MSE(self, training_data:pd.DataFrame, ratings):
+        """MSE computed at the end of training. Values greater than 5.0, and less than 0.0,
+        can be rounded to these values respectively"""
+        sum = 0.0
+        dif = 0.0
+        n = 0.0
+        for indices,_ in training_data.iterrows():
+            # indices is a tuple of (userId, movieId)
+            n += 1.0
+            y_hat = self.dot_product(indices[0], indices[1])
+            if y_hat > 5.0:
+                y_hat = 5.0
+            elif y_hat < 0.0:
+                y_hat = 0.0
+            dif = ratings[indices[0], indices[1]] - y_hat
             sum += dif**2
         return sum / n
         
@@ -216,12 +234,23 @@ class ALT_ALS_Model():
             if gradient_magnitude < self.convergence_threshold:
                 print(f"Converged at iteration {iteration}")
                 break
-
+        print(f"Final Training Loss: {self.final_MSE(training_data, ratings)}")
+        print(f"Final Testing Loss: {self.final_MSE(test_data, ratings)}")
         return self.user_factors, self.item_factors, self.user_biases, self.item_biases, train_losses, test_losses
     
-    # def predict_als(self, user_id, item_id):
-    #     """Predict the probability of the correct rating label given the attributes, user_factor[i] & item_factor[i]"""
-    #     return self.dot_product(user_id, item_id)
+    def recommend_nitems(self, n:int, user_id, index_item_dict):
+        """Reccomend n movies for user with user_id"""
+        reccomendations = []
+        for item_id,_ in self.id_to_index.items():
+            reccomendations.append((item_id,self.dot_product(user_id, item_id)))
+        reccomendations.sort(key=lambda tup: tup[1], reverse=True)
+        top = []
+        for i in range(n):
+            print(reccomendations[i])
+        for i in range(n):
+            top.append((index_item_dict.loc[reccomendations[i][0]])["title"])
+        return top
+
 
 if __name__=="__main__":
     #This is for testing

@@ -139,13 +139,13 @@ class ALS_Model():
             # Update user and item factors and biases
             for i in range(len(self.user_factors)):
                 for k in range(self.n_latency_factors):
-                    self.user_factors[i][k] -= self.eta * grad_user_factors[i][k]
-                self.user_biases[i] -= self.eta * grad_user_biases[i]
+                    self.user_factors[i][k] -= .45 * self.eta * grad_user_factors[i][k]
+                self.user_biases[i] -= .45 * self.eta * grad_user_biases[i]
 
             for j in range(len(self.item_factors[0])):
                 for k in range(self.n_latency_factors):
-                    self.item_factors[k][j] -= self.eta * grad_item_factors[j][k]
-                self.item_biases[j] -= self.eta * grad_item_biases[j]
+                    self.item_factors[k][j] -= .4 * self.eta * grad_item_factors[j][k]
+                self.item_biases[j] -= .4 * self.eta * grad_item_biases[j]
 
             train_loss = self.means_squared_error(training_data, ratings)
             test_loss = self.means_squared_error(test_data, ratings)
@@ -170,9 +170,18 @@ class ALS_Model():
 
         return self.user_factors, self.item_factors, self.user_biases, self.item_biases, train_losses, test_losses
     
-    # def predict_als(self, user_id, item_id):
-    #     """Predict the probability of the correct rating label given the attributes, user_factor[i] & item_factor[i]"""
-    #     return self.dot_product(user_id, item_id)
+    def recommend_nitems(self, n:int, user_id, index_item_dict):
+        """Reccomend n movies for user with user_id"""
+        reccomendations = []
+        for item_id,_ in self.id_to_index.items():
+            reccomendations.append((item_id,self.dot_product(user_id, item_id)))
+        reccomendations.sort(key=lambda tup: tup[1], reverse=True)
+        top = []
+        for i in range(n):
+            print(reccomendations[i])
+        for i in range(n):
+            top.append((index_item_dict.loc[reccomendations[i][0]])["title"])
+        return top
 
 if __name__=="__main__":
     #This is for testing

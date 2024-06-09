@@ -167,9 +167,7 @@ if __name__=="__main__":
         sys.exit(-1)
     #Load datasets into dataframes
     print("\tLoading movie/user matrix:", sys.argv[1], "\n\tUsing", sys.argv[2], "as key matrix.")
-    #train_user_items,test_user_items = load_user_item(sys.argv[1], "userId", "movieId", "rating")
     user_items = load_data(sys.argv[1], "userId", "movieId", "rating")
-    #print(train_user_items.shape)
     #Create CSR
     #train_user_items_csr = to_csr(train_user_items, "userId", "movieId", "rating")
     num_users = user_items["userId"].nunique()
@@ -181,25 +179,17 @@ if __name__=="__main__":
     user_items_csr = sparse.csr_array((user_items["rating"], (user_items["userId"], user_items["movieId"])), 
                                             shape=(num_users+1,user_items["movieId"].max()+1))
     partition_point = (user_items.shape[0] * 7)//10
+    #Partition Data
     train_user_items, test_user_items = user_items.iloc[:partition_point], user_items.iloc[partition_point:]
     #Make Total Data Multi-Indexed
     print("Multi-Indexing...")
     train_user_items.set_index(["userId", "movieId"], inplace=True)
     test_user_items.set_index(["userId", "movieId"], inplace=True)
+    print("Creating Model...")
     #<num_users> <num_items> <n_latency_factors> <eta> <max_iters> <convergence_threshold> <l2_factor> <factor_scale> <bias_scale>
     als_model = ALT_ALS_Model(user_items["movieId"].unique(), num_users, num_items, 50, .001, 20, .0001, .01, .1, 1.0)
-    #Partition Data
-    #Id-indexed
-    print(user_items_csr[1,1])
-    print(user_items_csr[1,47])
-    print(user_items_csr[1,2])
-
-
-    print(train_user_items.head(10))
-    print(test_user_items.head(10))
 
     
-    #als_model = ALT_ALS_Model(train_user_items, items_range, num_users, num_items, 50, .001, 10, .0001, .01, .1, 1.0)
     print("Training...")
     user_factors, item_factors, user_biases, item_biases, train_losses, test_losses = als_model.train(train_user_items, user_items_csr, test_user_items)
     
@@ -214,77 +204,11 @@ if __name__=="__main__":
     #Load index->item mapping
     #Used for recommendation
     index_item_dict = load_index_item(sys.argv[2], "movieId", "title")
+    #Reccomend 5 movies for user 2
+    print(als_model.recommend_nitems(5, 2, index_item_dict))
     #print(als_model.means_squared_error(train_user_items, user_items_csr))
     
     #merged = train_user_items.merge(index_item_dict, left_on="movieId", right_index=True)
 
 
-    # will maybe comment back in later
-    # began messing with pytorch
-    # check this link https://www.kaggle.com/code/jhoward/collaborative-filtering-deep-dive
-    # dls = CollabDataLoaders.from_df(merged, item_name='title', bs=64)
-    # dls.show_batch()
-    # n_users = len(dls.classes['userId'])
-    # n_movies = len(dls.classes['title'])
-    # n_factors = 5
-    # # Initialize user and item factors
-    # # This is part of the process of decomposing the user-item matrix into lower dimensional space
-    # user_factors = np.random.rand(n_users, n_factors)
-    # item_factors = np.random.rand(n_movies, n_factors)
     
-    # print("Initial User Factors:")
-    # print(user_factors)
-    # print("Initial Item Factors:")
-    # print(item_factors)
-
-    # Save the merged DataFrame to a new CSV file
-    # merged.to_csv('merged_output.csv', index=False)
-    
-    #Load user-item dataframe into csr_matrix format
-    #TODO: Get rid of extra row in csr_matrix? Or ignore?
-
-
-    #Create Model
-    """
-    als_model = create_als_model()
-    als_model.fit(train_user_items_csr)
-    #Get top 5
-    n_users = train_user_items["userId"].nunique()
-    #Don't we want this to start with 1?
-    userids = np.arange(n_users)
-    print(f"First User: {userids[0]}")
-    recommendations = []
-    for userid in userids:
-        movie_ids, ratings = als_model.recommend(userid+1, train_user_items_csr[userid+1], N=5)
-        # Debugging: Print the movie_ids to see what we get
-        print(f"User {(userid + 1)} recommended movie IDs: {movie_ids + 1}")
-        # Check if movie_id exists in index_item_dict to avoid KeyError
-        valid_movie_ids = [movie_id + 1 for movie_id in movie_ids if movie_id + 1 in index_item_dict.index]
-        recommendations.extend(valid_movie_ids)  # Collect all valid recommendations
-    
-    # Count the occurrences of each recommended movie and get the top 5 most common recommendations
-    movie_counter = Counter(recommendations)
-    top_5_recommendations = movie_counter.most_common(5)
-
-    print("Top 5 most common recommendations:")
-    for movie_id, count in top_5_recommendations:
-        movie_title = index_item_dict.loc[movie_id, "title"]
-        print(f"{movie_title}: {count} times recommended")
-
-    output_csr_as_txt("user-movie-rating.txt", train_user_items_csr, ["userId", "movieId", "rating"])
-    # numpy_array_to_txt("user-matrix.txt", user_factors)
-    # numpy_array_to_txt("item-matrix.txt", item_factors)
-
-    rmse = accuracy_tester(train_user_items, test_user_items, als_model)
-
-    # RMSE (Root Mean Squared Error) is a standard way to measure the error of a model in predicting 
-    # quantitative data. It provides an aggregate measure of the accuracy of the model's predictions. 
-    # The lower the RMSE, the better the model's performance in terms of predictive accuracy.
-    print(f"RMSE: {rmse}")
-
-    # I would be weary of the below print statement, I was working on the above numpy to txt function
-    # and I accidentally outputted a 1.3 GB txt file. It DOES NOT do this anymore (I had an extra for loop by accident), 
-    # but considering that this is small data, we might want to consider this in terms of efficiency, 
-    # storage, and timing for the bigger data set.
-    print("Done!")
-    """
