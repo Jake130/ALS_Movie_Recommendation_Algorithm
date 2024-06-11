@@ -1,7 +1,7 @@
 # ALS_Movie_Recommendation_Algorithm
 An Alternating Least Squares (ALS) algorithm trained off of GroupLen's MovieLens ml-latest-small dataset. Applies collaborative filtering by approximating a User-Movie Matrix used to recommend a movie for a given user.
 
-## main.py
+## _main.py_
 The main execution block of the script main.py is responsible for loading the data, creating a user-item matrix in CSR format, partitioning the data into training and testing sets, initializing and training an ALS model, and visualizing the training and testing losses. Below is a step-by-step description of what happens in this block:
 
 ### Argument Handling:
@@ -37,7 +37,7 @@ The main execution block of the script main.py is responsible for loading the da
 
 ---
 
-## alternate_training.py
+## _alternate_training.py_
 
 The script alternate_training.py defines the ALT_ALS_Model class, which implements the Alternating Least Squares (ALS) algorithm for collaborative filtering. Below is a detailed description of the class and its methods, focusing on how it is utilized in the main.py script.
 
